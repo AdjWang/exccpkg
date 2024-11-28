@@ -1,2 +1,4 @@
 __pycache__/
 **/deps/
+**/build/
+dspkg.egg-info

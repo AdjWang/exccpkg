@@ -22,10 +22,6 @@ class DsPkg:
     def add_dep(self, dep: DepInfo) -> None:
         self.__deps.append(dep)
     
-    def add_subdir(self, subdir: Path) -> None:
-        # TODO
-        pass
-    
     def resolve(self) -> None:
         tools.mkdirp(self.__download_dir)
         tools.mkdirp(self.__deps_dir)
