@@ -1,4 +1,7 @@
 __pycache__/
-**/deps/
+example/nested/deps/Bar/deps/
+example/nested/deps/abseil*/
+example/nested/deps/download/
+example/nested/deps/out/
 **/build/
 dspkg.egg-info
