@@ -15,10 +15,8 @@ class Config(dspkg.Config):
         self.project_dir = project_dir
         self.deps_dir = self.project_dir / "deps"
         self.download_dir = self.deps_dir / "download"
-        self.install_dir = self.deps_dir / "out"
-
         self.cmake_build_type = "Release"
-        self.cmake_module_dir = self.install_dir / "lib/cmake"
+        self.install_dir = self.deps_dir / "out" / self.cmake_build_type
 
     @override
     def config_downstream(self, downstream_cfg: Self) -> None:
@@ -42,15 +40,16 @@ class AbseilCpp(dspkg.Package):
 
     @staticmethod
     def build_absl(cfg: Config, src_dir: Path) -> Path:
-        build_dir = src_dir / "build"
+        build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=False)
         tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
                                 -DCMAKE_CXX_STANDARD=17
                                 -DCMAKE_INSTALL_PREFIX={cfg.install_dir}
                                 -DCMAKE_INSTALL_LIBDIR=lib
                                 -S {src_dir} -B {build_dir}""")
-        tools.run_cmd(f"""cmake --build {build_dir} --config={cfg.cmake_build_type}
-                                -j={cpu_count()}""")
+        tools.run_cmd(f"""cmake --build {build_dir}
+                                --config={cfg.cmake_build_type}
+                                --parallel={cpu_count()}""")
         return build_dir
 
     @staticmethod

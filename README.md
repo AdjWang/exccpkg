@@ -7,7 +7,7 @@ dspkg choose to let it go.
 ### CMake
 
 ```
-cmake -B build -G Ninja -DCMAKE_PREFIX_PATH=deps/out -DCMAKE_BUILD_TYPE=Release
+cmake -B build -G Ninja -DCMAKE_PREFIX_PATH=deps/out/Release -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build --config=Release
 ```
 
