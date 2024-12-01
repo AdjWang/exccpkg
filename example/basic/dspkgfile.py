@@ -2,47 +2,76 @@ import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 import shutil
-import sys
+from typing import Self
 
-# Add dspkg module path to module searching list.
-dspkg_dir = Path(sys.argv[0]).resolve().parents[3]
-sys.path.append(str(dspkg_dir))
+# Set proxy by python black magic :)
+# Would also apply to dependencies that using tool.download
+from urllib.parse import urlparse
+raw_download = tools.download
+def download(url: str, file_path: Path) -> None:
+    o = urlparse(url)
+    if o.hostname == "github.com":
+        # For machines reside in Chinese mainland.
+        url = "https://www.ghproxy.cn/" + url
+    raw_download(url, file_path)
+tools.download = download
+
 from dspkg import dspkg, tools
 
-PROJECT_DIR = Path(sys.argv[0]).resolve().parents[0]
-DEPS_DIR = PROJECT_DIR / "deps"
-DOWNLOAD_DIR = DEPS_DIR / "download"
-INSTALL_DIR = DEPS_DIR / "out"
 
-CMAKE_BUILD_TYPE = "Release"
-CMAKE_MODULE_DIR = INSTALL_DIR / "lib/cmake"
+class Config(dspkg.Config):
+    def __init__(self, upstream_cfg: Self | None = None) -> None:
+        super().__init__(upstream_cfg)
+        project_dir = Path(__file__).resolve().parents[0]
+        self.project_dir = project_dir
+        self.deps_dir = self.project_dir / "deps"
+        self.download_dir = self.deps_dir / "download"
+        self.install_dir = self.deps_dir / "out"
 
-logging.basicConfig(level=logging.INFO)
-
-# abseil-cpp
-def download_absl() -> Path:
-    url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20240722.0.tar.gz"
-    package_path = DOWNLOAD_DIR / "abseil-cpp-20240722.0.tar.gz"
-    tools.download(url, package_path)
-    shutil.unpack_archive(package_path, DEPS_DIR)
-    return DEPS_DIR / "abseil-cpp-20240722.0"
-
-def build_absl(src_dir: Path) -> Path:
-    build_dir = src_dir / "build"
-    tools.cmake_prepare_build_dir(build_dir, rebuild=True)
-    tools.run_cmd(f"""cmake
-        -DCMAKE_BUILD_TYPE={CMAKE_BUILD_TYPE}
-        -DCMAKE_CXX_STANDARD=17
-        -DCMAKE_INSTALL_PREFIX={INSTALL_DIR}
-        -DCMAKE_INSTALL_LIBDIR=lib
-        -S {src_dir} -B {build_dir}""")
-    tools.run_cmd(f"""cmake --build {build_dir} --config={CMAKE_BUILD_TYPE} -j={cpu_count()}""")
-    return build_dir
-
-def install_absl(build_dir: Path) -> None:
-    tools.run_cmd(f"""cmake --install {build_dir} --prefix={INSTALL_DIR}""")
+        self.cmake_build_type = "Release"
+        self.cmake_module_dir = self.install_dir / "lib/cmake"
 
 
-pkgs = dspkg.DsPkg(DOWNLOAD_DIR, DEPS_DIR, INSTALL_DIR)
-pkgs.add_dep(dspkg.DepInfo(download=download_absl, build=build_absl, install=install_absl))
-pkgs.resolve()
+class AbseilCpp(dspkg.Package):
+    def __init__(self) -> None:
+        super().__init__(self.download_absl, self.build_absl, self.install_absl)
+
+    @staticmethod
+    def download_absl(cfg: Config) -> Path:
+        url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20240722.0.tar.gz"
+        package_path = cfg.download_dir / "abseil-cpp-20240722.0.tar.gz"
+        tools.download(url, package_path)
+        shutil.unpack_archive(package_path, cfg.deps_dir)
+        return cfg.deps_dir / "abseil-cpp-20240722.0"
+
+    @staticmethod
+    def build_absl(cfg: Config, src_dir: Path) -> Path:
+        build_dir = src_dir / "build"
+        tools.cmake_prepare_build_dir(build_dir, rebuild=False)
+        tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
+                                -DCMAKE_CXX_STANDARD=17
+                                -DCMAKE_INSTALL_PREFIX={cfg.install_dir}
+                                -DCMAKE_INSTALL_LIBDIR=lib
+                                -S {src_dir} -B {build_dir}""")
+        tools.run_cmd(f"""cmake --build {build_dir} --config={cfg.cmake_build_type}
+                                -j={cpu_count()}""")
+        return build_dir
+
+    @staticmethod
+    def install_absl(cfg: Config, build_dir: Path) -> None:
+        tools.run_cmd(f"""cmake --install {build_dir}
+                                --prefix={cfg.install_dir}""")
+
+
+def resolve(cfg: Config) -> None:
+    tools.mkdirp(cfg.download_dir)
+    tools.mkdirp(cfg.deps_dir)
+    tools.mkdirp(cfg.install_dir)
+    dep_absl = AbseilCpp()
+    dep_absl.resolve(cfg)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    cfg = Config()
+    resolve(cfg)
