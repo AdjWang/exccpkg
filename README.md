@@ -1,4 +1,4 @@
-# DSPkg: A deadly simple C++ package manager
+# DSPkg: A dead simple C++ package manager
 
 dspkg choose to let it go.
 
