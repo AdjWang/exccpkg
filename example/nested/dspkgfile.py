@@ -5,6 +5,7 @@ import shutil
 from typing import Self, override
 
 import deps.Bar.dspkgfile as deps_bar
+import deps.Baz.dspkgfile as deps_baz
 from dspkg import dspkg, tools
 
 
@@ -43,6 +44,7 @@ class AbseilCpp(dspkg.Package):
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=False)
         tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
+                                -DABSL_MSVC_STATIC_RUNTIME=ON
                                 -DCMAKE_CXX_STANDARD=17
                                 -DCMAKE_INSTALL_PREFIX={cfg.install_dir}
                                 -DCMAKE_INSTALL_LIBDIR=lib
@@ -70,4 +72,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     cfg = Config()
     deps_bar.resolve(deps_bar.Config(cfg))
+    deps_baz.resolve(deps_baz.Config(cfg))
     resolve(cfg)

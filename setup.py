@@ -7,5 +7,5 @@ setup(
     author = 'AdjWang',
     author_email = 'wwang230513@gmail.com',
     packages = ['dspkg'],
-    install_requires = [],
+    install_requires = ['requests'],
 )
