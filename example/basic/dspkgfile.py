@@ -4,6 +4,8 @@ from pathlib import Path
 import shutil
 from typing import Self
 
+from dspkg import dspkg, tools
+
 # Set proxy by python black magic :)
 # Would also apply to dependencies that using tool.download
 from urllib.parse import urlparse
@@ -15,8 +17,6 @@ def download(url: str, file_path: Path) -> None:
         url = "https://www.ghproxy.cn/" + url
     raw_download(url, file_path)
 tools.download = download
-
-from dspkg import dspkg, tools
 
 
 class Config(dspkg.Config):

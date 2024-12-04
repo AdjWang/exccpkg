@@ -1,4 +1,5 @@
 __pycache__/
+example/basic/deps/
 example/nested/deps/Bar/deps/
 example/nested/deps/Baz/deps/
 example/nested/deps/abseil*/
