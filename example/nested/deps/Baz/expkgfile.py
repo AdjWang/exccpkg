@@ -4,10 +4,10 @@ from pathlib import Path
 import shutil
 from typing import Self
 
-from dspkg import dspkg, tools
+from expkg import expkg, tools
 
 
-class Config(dspkg.Config):
+class Config(expkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -23,7 +23,7 @@ class Config(dspkg.Config):
             self.msvc_rt_lib = "MultiThreadedDebug"
 
 
-class GoogleTest(dspkg.Package):
+class GoogleTest(expkg.Package):
     def __init__(self) -> None:
         super().__init__(self.download, self.build, self.install)
 

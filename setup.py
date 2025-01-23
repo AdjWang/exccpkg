@@ -1,11 +1,11 @@
 from setuptools import setup
 
 setup(
-    name = 'dspkg',
+    name = 'expkg',
     version = '1.0',
-    description = 'A dead simple C++ package manager.',
+    description = 'An explicit C++ package builder.',
     author = 'AdjWang',
     author_email = 'wwang230513@gmail.com',
-    packages = ['dspkg'],
+    packages = ['expkg'],
     install_requires = ['requests'],
 )

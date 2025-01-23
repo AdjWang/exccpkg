@@ -6,4 +6,4 @@ example/nested/deps/abseil*/
 example/nested/deps/download/
 example/nested/deps/out/
 **/build/
-dspkg.egg-info
+expkg.egg-info

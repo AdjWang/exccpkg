@@ -1,6 +1,4 @@
-# DSPkg: A dead simple C++ package manager
-
-dspkg choose to let it go.
+# expkg: An explicit C++ package builder
 
 ## Build project
 

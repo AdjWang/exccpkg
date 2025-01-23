@@ -2,14 +2,12 @@ import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 import shutil
-from typing import Self, override
+from typing import Self
 
-import deps.Bar.dspkgfile as deps_bar
-import deps.Baz.dspkgfile as deps_baz
-from dspkg import dspkg, tools
+from expkg import expkg, tools
 
 
-class Config(dspkg.Config):
+class Config(expkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -19,25 +17,18 @@ class Config(dspkg.Config):
         self.cmake_build_type = "Release"
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
 
-    @override
-    def config_downstream(self, downstream_cfg: Self) -> None:
-        """ May get or set depencence configurations here. """
-        if isinstance(downstream_cfg, deps_bar.Config):
-            logging.info(f"receive downstream config at {
-                         downstream_cfg.project_dir}")
 
-
-class AbseilCpp(dspkg.Package):
+class AbseilCpp(expkg.Package):
     def __init__(self) -> None:
         super().__init__(self.download_absl, self.build_absl, self.install_absl)
 
     @staticmethod
     def download_absl(cfg: Config) -> Path:
-        url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20240722.0.tar.gz"
-        package_path = cfg.download_dir / "abseil-cpp-20240722.0.tar.gz"
+        url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20230802.1.tar.gz"
+        package_path = cfg.download_dir / "abseil-cpp-20230802.1.tar.gz"
         tools.download(url, package_path)
         shutil.unpack_archive(package_path, cfg.deps_dir)
-        return cfg.deps_dir / "abseil-cpp-20240722.0"
+        return cfg.deps_dir / "abseil-cpp-20230802.1"
 
     @staticmethod
     def build_absl(cfg: Config, src_dir: Path) -> Path:
@@ -71,6 +62,4 @@ def resolve(cfg: Config) -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     cfg = Config()
-    deps_bar.resolve(deps_bar.Config(cfg))
-    deps_baz.resolve(deps_baz.Config(cfg))
     resolve(cfg)

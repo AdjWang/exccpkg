@@ -2,24 +2,14 @@ import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 import shutil
-from typing import Self
+from typing import Self, override
 
-from dspkg import dspkg, tools
-
-# Set proxy by python black magic :)
-# Would also apply to dependencies that using tool.download
-from urllib.parse import urlparse
-raw_download = tools.download
-def download(url: str, file_path: Path) -> None:
-    o = urlparse(url)
-    if o.hostname == "github.com":
-        # For machines reside in Chinese mainland.
-        url = "https://www.ghproxy.cn/" + url
-    raw_download(url, file_path)
-tools.download = download
+import deps.Bar.expkgfile as deps_bar
+import deps.Baz.expkgfile as deps_baz
+from expkg import expkg, tools
 
 
-class Config(dspkg.Config):
+class Config(expkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -29,8 +19,15 @@ class Config(dspkg.Config):
         self.cmake_build_type = "Release"
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
 
+    @override
+    def config_downstream(self, downstream_cfg: Self) -> None:
+        """ May get or set depencence configurations here. """
+        if isinstance(downstream_cfg, deps_bar.Config):
+            logging.info(f"receive downstream config at {
+                         downstream_cfg.project_dir}")
 
-class AbseilCpp(dspkg.Package):
+
+class AbseilCpp(expkg.Package):
     def __init__(self) -> None:
         super().__init__(self.download_absl, self.build_absl, self.install_absl)
 
@@ -47,6 +44,7 @@ class AbseilCpp(dspkg.Package):
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=False)
         tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
+                                -DABSL_MSVC_STATIC_RUNTIME=ON
                                 -DCMAKE_CXX_STANDARD=17
                                 -DCMAKE_INSTALL_PREFIX={cfg.install_dir}
                                 -DCMAKE_INSTALL_LIBDIR=lib
@@ -73,4 +71,6 @@ def resolve(cfg: Config) -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     cfg = Config()
+    deps_bar.resolve(deps_bar.Config(cfg))
+    deps_baz.resolve(deps_baz.Config(cfg))
     resolve(cfg)
