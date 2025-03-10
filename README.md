@@ -1,4 +1,4 @@
-# expkg: An explicit C++ package builder
+# exccpkg: An explicit C++ package builder
 
 ## Build project
 

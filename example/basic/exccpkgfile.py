@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 from typing import Self
 
-from expkg import expkg, tools
+from exccpkg import exccpkg, tools
 
 # Set proxy by python black magic :)
 # Would also apply to dependencies that using tool.download
@@ -19,7 +19,7 @@ def download(url: str, file_path: Path) -> None:
 tools.download = download
 
 
-class Config(expkg.Config):
+class Config(exccpkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -30,7 +30,7 @@ class Config(expkg.Config):
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
 
 
-class AbseilCpp(expkg.Package):
+class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
         super().__init__(self.download_absl, self.build_absl, self.install_absl)
 

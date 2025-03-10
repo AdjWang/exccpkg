@@ -4,10 +4,10 @@ from pathlib import Path
 import shutil
 from typing import Self
 
-from expkg import expkg, tools
+from exccpkg import exccpkg, tools
 
 
-class Config(expkg.Config):
+class Config(exccpkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -17,31 +17,25 @@ class Config(expkg.Config):
         self.cmake_build_type = "Release"
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
 
-        if self.cmake_build_type == "Release":
-            self.msvc_rt_lib = "MultiThreaded"
-        else:
-            self.msvc_rt_lib = "MultiThreadedDebug"
 
-
-class GoogleTest(expkg.Package):
+class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
-        super().__init__(self.download, self.build, self.install)
+        super().__init__(self.download_absl, self.build_absl, self.install_absl)
 
     @staticmethod
-    def download(cfg: Config) -> Path:
-        url = "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz"
-        package_path = cfg.download_dir / "googletest-1.15.2.tar.gz"
+    def download_absl(cfg: Config) -> Path:
+        url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20230802.1.tar.gz"
+        package_path = cfg.download_dir / "abseil-cpp-20230802.1.tar.gz"
         tools.download(url, package_path)
         shutil.unpack_archive(package_path, cfg.deps_dir)
-        return cfg.deps_dir / "googletest-1.15.2"
+        return cfg.deps_dir / "abseil-cpp-20230802.1"
 
     @staticmethod
-    def build(cfg: Config, src_dir: Path) -> Path:
+    def build_absl(cfg: Config, src_dir: Path) -> Path:
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=False)
         tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
-                                -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-                                -DCMAKE_MSVC_RUNTIME_LIBRARY={cfg.msvc_rt_lib}
+                                -DABSL_MSVC_STATIC_RUNTIME=ON
                                 -DCMAKE_CXX_STANDARD=17
                                 -DCMAKE_INSTALL_PREFIX={cfg.install_dir}
                                 -DCMAKE_INSTALL_LIBDIR=lib
@@ -52,7 +46,7 @@ class GoogleTest(expkg.Package):
         return build_dir
 
     @staticmethod
-    def install(cfg: Config, build_dir: Path) -> None:
+    def install_absl(cfg: Config, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
                                 --prefix={cfg.install_dir}""")
 
@@ -61,7 +55,7 @@ def resolve(cfg: Config) -> None:
     tools.mkdirp(cfg.download_dir)
     tools.mkdirp(cfg.deps_dir)
     tools.mkdirp(cfg.install_dir)
-    dep_absl = GoogleTest()
+    dep_absl = AbseilCpp()
     dep_absl.resolve(cfg)
 
 

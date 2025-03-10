@@ -122,7 +122,7 @@
             "markers": "python_version >= '3.7'",
             "version": "==3.4.1"
         },
-        "expkg": {
+        "exccpkg": {
             "file": "../..",
             "markers": "python_version >= '3.7'"
         },

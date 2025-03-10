@@ -4,12 +4,12 @@ from pathlib import Path
 import shutil
 from typing import Self, override
 
-import deps.Bar.expkgfile as deps_bar
-import deps.Baz.expkgfile as deps_baz
-from expkg import expkg, tools
+import example.nested.deps.Bar.exccpkgfile as deps_bar
+import example.nested.deps.Baz.exccpkgfile as deps_baz
+from exccpkg import exccpkg, tools
 
 
-class Config(expkg.Config):
+class Config(exccpkg.Config):
     def __init__(self, upstream_cfg: Self | None = None) -> None:
         super().__init__(upstream_cfg)
         project_dir = Path(__file__).resolve().parents[0]
@@ -27,7 +27,7 @@ class Config(expkg.Config):
                          downstream_cfg.project_dir}")
 
 
-class AbseilCpp(expkg.Package):
+class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
         super().__init__(self.download_absl, self.build_absl, self.install_absl)
 

@@ -60,5 +60,5 @@ def run_cmd(cmd: str) -> None:
     segments = cmd.split("\n")
     segments = [seg.strip(" ") for seg in segments]
     formatted_cmd = " ".join(segments)
-    logging.debug(f"ExPkg:{os.getcwd()}$ {formatted_cmd}")
+    logging.debug(f"ExccPkg:{os.getcwd()}$ {formatted_cmd}")
     os.system(formatted_cmd)
