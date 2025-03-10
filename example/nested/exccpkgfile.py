@@ -2,7 +2,11 @@ import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 import shutil
-from typing import Self, override
+from typing import override
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import example.nested.deps.Bar.exccpkgfile as deps_bar
 import example.nested.deps.Baz.exccpkgfile as deps_baz

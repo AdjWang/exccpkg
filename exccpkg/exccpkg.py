@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from pathlib import Path
-from typing import Callable, Self
+from typing import Callable
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 
 class Config:

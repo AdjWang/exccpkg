@@ -2,7 +2,10 @@ import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 import shutil
-from typing import Self
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 from exccpkg import exccpkg, tools
 
