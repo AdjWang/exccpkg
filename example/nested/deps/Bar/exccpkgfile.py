@@ -23,10 +23,10 @@ class Config(exccpkg.Config):
 
 class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
-        super().__init__(self.download_absl, self.build_absl, self.install_absl)
+        super().__init__(self.download, self.build, self.install)
 
     @staticmethod
-    def download_absl(cfg: Config) -> Path:
+    def download(cfg: Config) -> Path:
         url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20230802.1.tar.gz"
         package_path = cfg.download_dir / "abseil-cpp-20230802.1.tar.gz"
         tools.download(url, package_path)
@@ -34,7 +34,7 @@ class AbseilCpp(exccpkg.Package):
         return cfg.deps_dir / "abseil-cpp-20230802.1"
 
     @staticmethod
-    def build_absl(cfg: Config, src_dir: Path) -> Path:
+    def build(cfg: Config, src_dir: Path) -> Path:
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=False)
         tools.run_cmd(f"""cmake -DCMAKE_BUILD_TYPE={cfg.cmake_build_type}
@@ -49,7 +49,7 @@ class AbseilCpp(exccpkg.Package):
         return build_dir
 
     @staticmethod
-    def install_absl(cfg: Config, build_dir: Path) -> None:
+    def install(cfg: Config, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
                                 --prefix={cfg.install_dir}""")
 

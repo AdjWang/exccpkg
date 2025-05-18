@@ -6,6 +6,7 @@ from pathlib import Path
 import platform
 import requests
 import shutil
+import subprocess
 try:
     from tqdm import tqdm
 except ImportError:
@@ -47,12 +48,12 @@ def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True) -> None:
                 cmd = f"del /f /q {path}"
             logging.warning(
                 f"Failed to run {func} on {path}, err={excvalue} try command={cmd}")
-            os.system(cmd)
+            run_cmd(cmd)
         else:
             raise Exception(exc)
     if rebuild and build_dir.exists():
         shutil.rmtree(build_dir, ignore_errors=False,
-                      onerror=__rm_readonly)
+                      onexc=__rm_readonly)
     mkdirp(build_dir)
 
 
@@ -61,4 +62,11 @@ def run_cmd(cmd: str) -> None:
     segments = [seg.strip(" ") for seg in segments]
     formatted_cmd = " ".join(segments)
     logging.debug(f"ExccPkg:{os.getcwd()}$ {formatted_cmd}")
-    os.system(formatted_cmd)
+    proc = subprocess.Popen(
+        formatted_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
+    for line in iter(proc.stdout.readline, b""):
+        print(line.decode(), end="")
+    returncode = proc.wait()
+    if returncode != 0:
+        raise Exception(f"Failed to execute cmd=\"{formatted_cmd}\" exit={returncode}")
+

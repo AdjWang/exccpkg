@@ -3,6 +3,7 @@ example/basic/deps/
 example/nested/deps/Bar/deps/
 example/nested/deps/Baz/deps/
 example/nested/deps/abseil*/
+example/nested/deps/googletest*/
 example/nested/deps/download/
 example/nested/deps/out/
 **/build/
