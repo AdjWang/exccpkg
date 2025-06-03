@@ -62,8 +62,10 @@ def run_cmd(cmd: str) -> None:
     segments = [seg.strip(" ") for seg in segments]
     formatted_cmd = " ".join(segments)
     logging.debug(f"ExccPkg:{os.getcwd()}$ {formatted_cmd}")
+    # Use shell=True since commands are provided by project author, security check is useless.
     proc = subprocess.Popen(
-        formatted_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
+        formatted_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        shell=True, env=os.environ)
     for line in iter(proc.stdout.readline, b""):
         print(line.decode(), end="")
     returncode = proc.wait()
