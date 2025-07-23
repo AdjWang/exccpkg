@@ -1,9 +1,9 @@
 from collections import defaultdict
 import logging
 from multiprocessing import cpu_count
+import os
 from pathlib import Path
 import platform
-import shutil
 try:
     from typing import Self
 except ImportError:
@@ -15,8 +15,7 @@ from exccpkg import exccpkg, tools
 
 
 class Config(exccpkg.Config):
-    def __init__(self, upstream_cfg: Self | None = None) -> None:
-        super().__init__(upstream_cfg)
+    def __init__(self) -> None:
         project_dir = Path(__file__).resolve().parents[0]
         self.project_dir = project_dir
         self.deps_dir = self.project_dir / "deps"
@@ -66,6 +65,7 @@ class Config(exccpkg.Config):
             self.cmake_common += f'-DCMAKE_CXX_FLAGS="{CXXFLAGS["Windows"][self.cmake_build_type]} "'
             self.cmake_common += f'-DCMAKE_LINK_FLAGS="{LDFLAGS["Windows"][self.cmake_build_type]} "'
 
+        self.dryrun = True
         self.rebuild = False
 
 
@@ -73,31 +73,34 @@ class CMakeCommon:
     @staticmethod
     def download(cfg: Config, url: str, pkg_name: str, ext: str) -> Path:
         package_path = cfg.download_dir / f"{pkg_name}{ext}"
-        tools.download(url, package_path)
-        shutil.unpack_archive(package_path, cfg.deps_dir)
-        return cfg.deps_dir / pkg_name
+        src_path = cfg.deps_dir / pkg_name
+        tools.download(url, package_path, cfg.dryrun)
+        tools.unpack(package_path, cfg.deps_dir, cfg.dryrun)
+        return src_path
     
     @staticmethod
     def build(cfg: Config, src_dir: Path, cmake_options: str = "") -> Path:
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
-        tools.cmake_prepare_build_dir(build_dir, rebuild=cfg.rebuild)
+        if not cfg.dryrun:
+            tools.cmake_prepare_build_dir(build_dir, rebuild=cfg.rebuild)
         tools.run_cmd(f"""cmake {cfg.cmake_common} {cmake_options}
                                 -G {cfg.generator} -S {src_dir}
-                                -B {build_dir}""")
+                                -B {build_dir}""", cfg.dryrun)
         tools.run_cmd(f"""cmake --build {build_dir}
                                 --config={cfg.cmake_build_type}
-                                --parallel={cpu_count()}""")
+                                --parallel={cpu_count()}""", cfg.dryrun)
         return build_dir
     
     @staticmethod
     def install(cfg: Config, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
-                                --prefix={cfg.install_dir}""")
+                                --prefix={cfg.install_dir}""", cfg.dryrun)
 
 
 class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
-        super().__init__(self.download, self.build, CMakeCommon.install)
+        super().__init__("abseil-cpp", "20240722.0",
+                         self.download, self.build, CMakeCommon.install)
 
     @staticmethod
     def download(cfg: Config) -> Path:
@@ -109,23 +112,26 @@ class AbseilCpp(exccpkg.Package):
         return CMakeCommon.build(cfg, src_dir, "-DABSL_MSVC_STATIC_RUNTIME=ON")
 
 
-def resolve(cfg: Config) -> None:
+def collect() -> exccpkg.PackageCollection:
+    collection = exccpkg.PackageCollection([
+        AbseilCpp(),
+        # ...
+    ])
+    collection.merge(deps_bar.collect())
+    collection.merge(deps_baz.collect())
+    return collection
+
+
+def resolve(cfg: Config, collection: exccpkg.PackageCollection) -> None:
     tools.mkdirp(cfg.download_dir)
     tools.mkdirp(cfg.deps_dir)
     tools.mkdirp(cfg.install_dir)
     # Override child project's configuration to ensure ABI compatibility.
-    deps_bar.resolve(cfg)
-    deps_baz.resolve(cfg)
-    deps = [
-        AbseilCpp(),
-        # ...
-    ]
-    for dep in deps:
-        dep.resolve(cfg)
-
+    collection.resolve(cfg)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     cfg = Config()
-    resolve(cfg)
+    collection = collect()
+    resolve(cfg, collection)

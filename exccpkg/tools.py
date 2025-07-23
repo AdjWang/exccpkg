@@ -20,9 +20,11 @@ def mkdirp(dir: Path) -> None:
     dir.mkdir(parents=True, exist_ok=True)
 
 
-def download(url: str, file_path: Path) -> None:
+def download(url: str, file_path: Path, dryrun: bool=False) -> None:
     """ Download file from the url to file_path. """
-    logging.info(f"Download {url} -> {file_path}")
+    logging.info(f"Download: {url} -> {file_path}")
+    if dryrun:
+        return
     if file_path.exists():
         return
     resp = requests.get(url, stream=True)
@@ -32,6 +34,13 @@ def download(url: str, file_path: Path) -> None:
     with open(file_path, "wb") as fs:
         for data in tqdm(resp.iter_content(), total=total_length):
             fs.write(data)
+
+
+def unpack(package_path: Path, target_dir: Path, dryrun: bool=False) -> None:
+    logging.info(f"Unpack: {package_path} -> {target_dir}")
+    if dryrun:
+        return
+    shutil.unpack_archive(package_path, target_dir)
 
 
 def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True) -> None:
@@ -57,11 +66,13 @@ def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True) -> None:
     mkdirp(build_dir)
 
 
-def run_cmd(cmd: str) -> None:
+def run_cmd(cmd: str, dryrun: bool=False) -> None:
     segments = cmd.split("\n")
     segments = [seg.strip(" ") for seg in segments]
     formatted_cmd = " ".join(segments)
-    logging.debug(f"ExccPkg:{os.getcwd()}$ {formatted_cmd}")
+    logging.info(f"Execute: {os.getcwd()}$ {formatted_cmd}")
+    if dryrun:
+        return
     # Use shell=True since commands are provided by project author, security check is useless.
     proc = subprocess.Popen(
         formatted_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
