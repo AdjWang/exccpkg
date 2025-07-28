@@ -131,7 +131,7 @@ def resolve(cfg: Config, collection: exccpkg.PackageCollection) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     cfg = Config()
     collection = collect()
     resolve(cfg, collection)

@@ -84,31 +84,35 @@ class CMakeCommon:
     @staticmethod
     def download(cfg: Config, url: str, pkg_name: str, ext: str) -> Path:
         package_path = cfg.download_dir / f"{pkg_name}{ext}"
-        tools.download(url, package_path)
-        shutil.unpack_archive(package_path, cfg.deps_dir)
-        return cfg.deps_dir / pkg_name
+        src_path = cfg.deps_dir / pkg_name
+        tools.download(url, package_path, cfg.dryrun)
+        tools.unpack(package_path, cfg.deps_dir, cfg.dryrun)
+        return src_path
     
     @staticmethod
     def build(cfg: Config, src_dir: Path, cmake_options: str = "") -> Path:
         build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
-        tools.cmake_prepare_build_dir(build_dir, rebuild=cfg.rebuild)
+        if not cfg.dryrun:
+            tools.cmake_prepare_build_dir(build_dir, rebuild=cfg.rebuild)
         tools.run_cmd(f"""cmake {cfg.cmake_common} {cmake_options}
                                 -G {cfg.generator} -S {src_dir}
-                                -B {build_dir}""")
+                                -B {build_dir}""", cfg.dryrun)
         tools.run_cmd(f"""cmake --build {build_dir}
                                 --config={cfg.cmake_build_type}
-                                --parallel={cpu_count()}""")
+                                --parallel={cpu_count()}""", cfg.dryrun)
         return build_dir
     
     @staticmethod
     def install(cfg: Config, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
-                                --prefix={cfg.install_dir}""")
+                                --prefix={cfg.install_dir}""", cfg.dryrun)
+
 
 
 class AbseilCpp(exccpkg.Package):
     def __init__(self) -> None:
-        super().__init__(self.download, self.build, CMakeCommon.install)
+        super().__init__("abseil-cpp", "20240722.0",
+                         self.download, self.build, CMakeCommon.install)
 
     @staticmethod
     def download(cfg: Config) -> Path:
@@ -120,19 +124,24 @@ class AbseilCpp(exccpkg.Package):
         return CMakeCommon.build(cfg, src_dir, "-DABSL_MSVC_STATIC_RUNTIME=ON")
 
 
-def resolve(cfg: Config) -> None:
+def collect() -> exccpkg.PackageCollection:
+    collection = exccpkg.PackageCollection([
+        AbseilCpp(),
+        # ...
+    ])
+    return collection
+
+
+def resolve(cfg: Config, collection: exccpkg.PackageCollection) -> None:
     tools.mkdirp(cfg.download_dir)
     tools.mkdirp(cfg.deps_dir)
     tools.mkdirp(cfg.install_dir)
-    deps = [
-        AbseilCpp(),
-        # ...
-    ]
-    for dep in deps:
-        dep.resolve(cfg)
+    # Override child project's configuration to ensure ABI compatibility.
+    collection.resolve(cfg)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     cfg = Config()
-    resolve(cfg)
+    collection = collect()
+    resolve(cfg, collection)
