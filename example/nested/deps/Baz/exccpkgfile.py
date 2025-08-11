@@ -4,16 +4,12 @@ from multiprocessing import cpu_count
 import os
 from pathlib import Path
 import platform
-import shutil
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import override
 
 from exccpkg import exccpkg, tools
 
 
-class Config(exccpkg.Config):
+class Config:
     def __init__(self) -> None:
         project_dir = Path(__file__).resolve().parents[0]
         self.project_dir = project_dir
@@ -69,57 +65,73 @@ class Config(exccpkg.Config):
 
 
 class CMakeCommon:
-    @staticmethod
-    def download(cfg: Config, url: str, pkg_name: str, ext: str) -> Path:
-        package_path = cfg.download_dir / f"{pkg_name}{ext}"
-        src_path = cfg.deps_dir / pkg_name
-        tools.download(url, package_path, cfg.dryrun)
-        tools.unpack(package_path, cfg.deps_dir, cfg.dryrun)
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+
+    def download(self, url: str, pkg_name: str, ext: str) -> Path:
+        package_path = self.cfg.download_dir / f"{pkg_name}{ext}"
+        src_path = self.cfg.deps_dir / pkg_name
+        tools.download(url, package_path, self.cfg.dryrun)
+        tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
         return src_path
     
-    @staticmethod
-    def build(cfg: Config, src_dir: Path, cmake_options: str = "") -> Path:
-        build_dir = src_dir / "cmake_build" / cfg.cmake_build_type
-        if not cfg.dryrun:
-            tools.cmake_prepare_build_dir(build_dir, rebuild=cfg.rebuild)
-        tools.run_cmd(f"""cmake {cfg.cmake_common} {cmake_options}
-                                -G {cfg.generator} -S {src_dir}
-                                -B {build_dir}""", cfg.dryrun)
+    def build(self, src_dir: Path, cmake_options: str = "") -> Path:
+        build_dir = src_dir / "cmake_build" / self.cfg.cmake_build_type
+        if not self.cfg.dryrun:
+            tools.cmake_prepare_build_dir(build_dir, rebuild=self.cfg.rebuild)
+        tools.run_cmd(f"""cmake {self.cfg.cmake_common} {cmake_options}
+                                -G {self.cfg.generator} -S {src_dir}
+                                -B {build_dir}""", self.cfg.dryrun)
         tools.run_cmd(f"""cmake --build {build_dir}
-                                --config={cfg.cmake_build_type}
-                                --parallel={cpu_count()}""", cfg.dryrun)
+                                --config={self.cfg.cmake_build_type}
+                                --parallel={cpu_count()}""", self.cfg.dryrun)
         return build_dir
     
-    @staticmethod
-    def install(cfg: Config, build_dir: Path) -> None:
+    def install(self, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
-                                --prefix={cfg.install_dir}""", cfg.dryrun)
+                                --prefix={self.cfg.install_dir}""", self.cfg.dryrun)
+
+
+class Context(exccpkg.Context):
+    def __init__(self):
+        self.cfg = Config()
+        self.cmake = CMakeCommon(self.cfg)
 
 
 class AbseilCpp(exccpkg.Package):
-    def __init__(self) -> None:
-        super().__init__("abseil-cpp", "20240722.0",
-                         self.download, self.build, CMakeCommon.install)
+    name = "abseil-cpp"
+    version = "20240722.0"
 
-    @staticmethod
-    def download(cfg: Config) -> Path:
+    @override
+    def grab(self, ctx: Context) -> Path:
         url = "https://github.com/abseil/abseil-cpp/archive/refs/tags/20240722.0.tar.gz"
-        return CMakeCommon.download(cfg, url, "abseil-cpp-20240722.0", ".tar.gz")
+        return ctx.cmake.download(url, "abseil-cpp-20240722.0", ".tar.gz")
 
-    @staticmethod
-    def build(cfg: Config, src_dir: Path) -> Path:
-        return CMakeCommon.build(cfg, src_dir, "-DABSL_MSVC_STATIC_RUNTIME=ON")
+    @override
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        return ctx.cmake.build(src_dir, "-DABSL_MSVC_STATIC_RUNTIME=ON")
+
+    @override
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        return ctx.cmake.install(build_dir)
 
 
 class GoogleTest(exccpkg.Package):
-    def __init__(self) -> None:
-        super().__init__("googletest", "1.15.2",
-                         self.download, CMakeCommon.build, CMakeCommon.install)
+    name = "googletest"
+    version = "1.15.2"
 
-    @staticmethod
-    def download(cfg: Config) -> Path:
+    @override
+    def grab(self, ctx: Context) -> Path:
         url = "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz"
-        return CMakeCommon.download(cfg, url, "googletest-1.15.2", ".tar.gz")
+        return ctx.cmake.download(url, "googletest-1.15.2", ".tar.gz")
+
+    @override
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        return ctx.cmake.build(src_dir)
+
+    @override
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        return ctx.cmake.install(build_dir)
 
 
 def collect() -> exccpkg.PackageCollection:
@@ -131,17 +143,16 @@ def collect() -> exccpkg.PackageCollection:
     return collection
 
 
-def resolve(cfg: Config, collection: exccpkg.PackageCollection) -> None:
-    tools.mkdirp(cfg.download_dir)
-    tools.mkdirp(cfg.deps_dir)
-    tools.mkdirp(cfg.install_dir)
+def resolve(ctx: Context, collection: exccpkg.PackageCollection) -> None:
+    tools.mkdirp(ctx.cfg.download_dir)
+    tools.mkdirp(ctx.cfg.deps_dir)
+    tools.mkdirp(ctx.cfg.install_dir)
     # Override child project's configuration to ensure ABI compatibility.
-    collection.resolve(cfg)
-
+    collection.resolve(ctx)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    cfg = Config()
+    ctx = Context()
     collection = collect()
-    resolve(cfg, collection)
+    resolve(ctx, collection)

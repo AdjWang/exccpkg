@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from abc import ABC, abstractmethod
 from collections import Counter
 import inspect
 import logging
@@ -10,35 +11,42 @@ except ImportError:
     from typing_extensions import Self
 
 
-class Config:
+class Context:
     """ Add anything you need, then passed to resolve. """
     def __init__(self) -> None:
         ...
 
 
-class Package:
-    def __init__(self, name: str, version: str, grab: Callable[[Config], Path],
-                 build: Callable[[Config, Path], Path],
-                 install: Callable[[Config, Path], None]) -> None:
+class Package(ABC):
+    def __init__(self) -> None:
         """
         Args:
             name: Package name, used to identify duplications.
             version: Package version, used to identify duplications.
-            grab: Grab package source files. Input config, return package source path.
-            build: Build package. Input config and source path, return build path.
-            install: Install package. Input config and build path.
         """
-        self.name = name
-        self.version = version
-        self.__grab = grab
-        self.__build = build
-        self.__install = install
+        assert(hasattr(self, "name"))
+        assert(hasattr(self, "version"))
 
-    def resolve(self, cfg: Config) -> None:
+    @abstractmethod
+    def grab(self, ctx: Context) -> Path:
+        """ Grab package source files. Input context, return package source path. """
+        ...
+
+    @abstractmethod
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        """ Build package. Input context and source path, return build path. """
+        ...
+
+    @abstractmethod
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        """ Install package. Input context and build path. """
+        ...
+
+    def resolve(self, ctx: Context) -> None:
         """ Run grag, build and install in order. """
-        src_dir = self.__grab(cfg)
-        build_dir = self.__build(cfg, src_dir)
-        self.__install(cfg, build_dir)
+        src_dir = self.grab(ctx)
+        build_dir = self.build(ctx, src_dir)
+        self.install(ctx, build_dir)
 
 
 class PackageCollection:
@@ -48,10 +56,10 @@ class PackageCollection:
     def merge(self, collection: Self) -> None:
         self.__deps.extend(collection.__deps)
     
-    def resolve(self, cfg: Config) -> None:
+    def resolve(self, ctx: Context) -> None:
         no_dup_deps = self.__drop_duplicates()
         for dep in no_dup_deps:
-            dep.resolve(cfg)
+            dep.resolve(ctx)
 
     def __find_duplicate_deps(self) -> Dict[str, List[int]]:
         names = [dep.name for dep in self.__deps]
