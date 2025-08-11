@@ -4,7 +4,7 @@ from collections import Counter
 import inspect
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Dict, List
 try:
     from typing import Self
 except ImportError:

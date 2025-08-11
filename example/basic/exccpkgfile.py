@@ -8,17 +8,17 @@ from typing import override
 
 from exccpkg import exccpkg, tools
 
-# Set proxy by python black magic :)
+# Setup proxy by python black magic :)
 # Would also apply to dependencies that using tool.download
-from urllib.parse import urlparse
-raw_download = tools.download
-def download(url: str, file_path: Path, dryrun: bool=False) -> None:
-    o = urlparse(url)
-    if o.hostname == "github.com":
-        # For machines reside in Chinese mainland.
-        url = "https://www.ghproxy.cn/" + url
-    raw_download(url, file_path, dryrun)
-tools.download = download
+# from urllib.parse import urlparse
+# raw_download = tools.download
+# def download(url: str, file_path: Path, dryrun: bool=False) -> None:
+#     o = urlparse(url)
+#     if o.hostname == "github.com":
+#         # For machines reside in Chinese mainland.
+#         url = "https://www.ghproxy.cn/" + url
+#     raw_download(url, file_path, dryrun)
+# tools.download = download
 
 
 class Config:
@@ -49,18 +49,9 @@ class Config:
         LDFLAGS["Windows"]["Debug"] = "/OPT:REF /INCREMENTAL:NO"
         LDFLAGS["Windows"]["Release"] = "/OPT:REF /INCREMENTAL:NO"
 
-        if self.cmake_build_type == "Release":
-            self.msvc_rt_lib = "MultiThreaded"
-        else:
-            self.msvc_rt_lib = "MultiThreadedDebug"
-
-        # Use policy CMP0091 with CMAKE_MSVC_RUNTIME_LIBRARY
-        # See: https://cmake.org/cmake/help/latest/policy/CMP0091.html
         self.cmake_common = f"""
             -DCMAKE_BUILD_TYPE={self.cmake_build_type}
             -DCMAKE_CXX_STANDARD=23
-            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-            -DCMAKE_MSVC_RUNTIME_LIBRARY={self.msvc_rt_lib}
             -DCMAKE_INSTALL_PREFIX={self.install_dir}
             -DCMAKE_INSTALL_LIBDIR=lib """
         if platform.system() == "Linux":
@@ -68,6 +59,13 @@ class Config:
             os.environ["CXXFLAGS"] = CXXFLAGS["Linux"][self.cmake_build_type]
             os.environ["LDFLAGS"] = LDFLAGS["Linux"][self.cmake_build_type]
         elif platform.system() == "Windows":
+            if self.cmake_build_type == "Release":
+                self.msvc_rt_lib = "MultiThreaded"
+            else:
+                self.msvc_rt_lib = "MultiThreadedDebug"
+            # Use policy CMP0091 with CMAKE_MSVC_RUNTIME_LIBRARY
+            # See: https://cmake.org/cmake/help/latest/policy/CMP0091.html
+            self.cmake_common += f'-DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY={self.msvc_rt_lib} '
             self.cmake_common += f'-DCMAKE_C_FLAGS="{CFLAGS["Windows"][self.cmake_build_type]} "'
             self.cmake_common += f'-DCMAKE_CXX_FLAGS="{CXXFLAGS["Windows"][self.cmake_build_type]} "'
             self.cmake_common += f'-DCMAKE_LINK_FLAGS="{LDFLAGS["Windows"][self.cmake_build_type]} "'
