@@ -4,7 +4,7 @@ from collections import Counter
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 try:
     from typing import Self
 except ImportError:
@@ -48,13 +48,18 @@ class Package(ABC):
         build_dir = self.build(ctx, src_dir)
         self.install(ctx, build_dir)
 
-
 class PackageCollection:
     def __init__(self, deps: List[Package]) -> None:
         self.__deps = deps
+        self.__deps_depth: Dict[str, Tuple[int, Package]] = dict()
+        for dep in self.__deps:
+            self.__deps_depth[f"{dep.name}-{dep.version}"] = (0, dep)
 
     def merge(self, collection: Self) -> None:
+        """ Merge packages from child projects with larger depth. """
         self.__deps.extend(collection.__deps)
+        for id, dep in collection.__deps_depth.items():
+            self.__deps_depth[id] = (dep[0] + 1, dep[1])
     
     def resolve(self, ctx: Context) -> None:
         no_dup_deps = self.__drop_duplicates()
@@ -93,11 +98,9 @@ class PackageCollection:
             else:
                 logging.debug(f"Find duplications name={dup_dep_name} vers={dep_vers} infos={dep_infos}")
         # Drop duplications.
-        self.__deps_dict: Dict[str, Package] = dict()
-        for dep in self.__deps:
-            self.__deps_dict[f"{dep.name}-{dep.version}"] = dep
-        no_dup_deps = list(self.__deps_dict.values())
-        # Output in alpha order.
-        no_dup_deps = sorted(no_dup_deps, key=lambda x: x.name)
-        logging.debug(f"Packages={[f"{dep.name}-{dep.version}" for dep in no_dup_deps]}")
-        return no_dup_deps
+        no_dup_deps: List[Tuple[int, Package]] = list(self.__deps_depth.values())
+        # Output in depth decending order.
+        no_dup_deps = sorted(no_dup_deps, key=lambda x: x[0])
+        output_deps = [dep[1] for dep in reversed(no_dup_deps)]
+        logging.debug(f"Packages={[f"{dep.name}-{dep.version}" for dep in output_deps]}")
+        return output_deps

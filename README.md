@@ -1,6 +1,6 @@
 # exccpkg: An explicit C++ package builder
 
-A simple toolset(< 200 loc) dedicated to take over control C++ build-from-source pipeline by making everything explicit.
+A simple toolset dedicated to take over control C++ build-from-source pipeline by making everything explicit.
 
 ## Install
 

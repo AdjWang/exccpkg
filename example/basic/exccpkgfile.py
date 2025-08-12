@@ -88,8 +88,7 @@ class CMakeCommon:
     
     def build(self, src_dir: Path, cmake_options: str = "") -> Path:
         build_dir = src_dir / "cmake_build" / self.cfg.cmake_build_type
-        if not self.cfg.dryrun:
-            tools.cmake_prepare_build_dir(build_dir, rebuild=self.cfg.rebuild)
+        tools.cmake_prepare_build_dir(build_dir, rebuild=self.cfg.rebuild, dryrun=self.cfg.dryrun)
         tools.run_cmd(f"""cmake {self.cfg.cmake_common} {cmake_options}
                                 -G {self.cfg.generator} -S {src_dir}
                                 -B {build_dir}""", self.cfg.dryrun)
@@ -135,9 +134,9 @@ class NlohmannJson(exccpkg.Package):
     def grab(self, ctx: Context) -> Path:
         url = "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp"
         download_path = ctx.cfg.download_dir / "nlohmann-json-3.11.3.hpp"
-        tools.download(url, download_path)
+        tools.download(url, download_path, ctx.cfg.dryrun)
         output_dir = ctx.cfg.deps_dir / "nlohmann-json-3.11.3"
-        tools.mkdirp(output_dir)
+        tools.mkdirp(output_dir, ctx.cfg.dryrun)
         shutil.copy(download_path, output_dir)
         return output_dir
 
@@ -149,7 +148,7 @@ class NlohmannJson(exccpkg.Package):
     @override
     def install(self, ctx: Context, build_dir: Path) -> None:
         install_dir = ctx.cfg.install_dir / "include/nlohmann"
-        tools.mkdirp(install_dir)
+        tools.mkdirp(install_dir, ctx.cfg.dryrun)
         shutil.copy(build_dir / "nlohmann-json-3.11.3.hpp", install_dir / "json.hpp")
 
 
