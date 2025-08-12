@@ -34,7 +34,7 @@ Notice:
 
 Requires ninja as default generator. Ninja is optional and set in `exccpkgfile.py`, use whatever you like.
 
-**On windows, MUST use [Developer Command Prompt or Developer PowerShell](https://learn.microsoft.com/en-us/visualstudio/ide/reference/command-prompt-powershell?view=vs-2022).** Developer console sets up compiler path as environment variable, which is essential for cmake.
+**On windows, one MUST use [Developer Command Prompt or Developer PowerShell](https://learn.microsoft.com/en-us/visualstudio/ide/reference/command-prompt-powershell?view=vs-2022).** Developer console sets up compiler path as environment variable, which is essential for cmake.
 
 ```
 python3 exccpkgfile.py
@@ -88,4 +88,8 @@ Cons
 
   - Manually ABI compability control.
 
+    Compiler configurations must be consistent between `exccpkgfile.py` and build command. If any thing is broken, the compiler often failes with link errors.
+
   - Duplicated source code at project level.
+
+    Exccpkg put all dependency source codes under current working project directory. Multiple projects may contain the same dependency but share nothing. For small projects, which often have dependencies no more than 30, this is not a big problem. If you really need to share some huge dependencies, directly return the folder path in `grab` function instead of copy or download.
