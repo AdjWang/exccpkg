@@ -18,7 +18,7 @@ pip3 install exccpkg
 
 ### Write `exccpkgfile.py`
 
-Examples see `example/.../exccpkgfile.py`, support nested local projects, proxy, download by copy from local files...
+Examples see `example/.../exccpkgfile.py`, supports nested local projects, proxy, grab by copy files...
 
 Notice:
 
@@ -40,6 +40,8 @@ Requires ninja as default generator. Ninja is optional and set in `exccpkgfile.p
 python3 exccpkgfile.py
 ```
 
+Build results output to `deps/out/[Debug/Release]`, headers in `include`, libraries in `lib`. The path is configurable in `exccpkgfile.py`, but it's recommend to stay the same among all projects otherwise the install path has to be set explicitly in `CMakeLists.txt`.
+
 ### Build project
 
 #### CMake
@@ -57,6 +59,8 @@ cmake --build ./build --config Release --target all -j $env:NUMBER_OF_PROCESSORS
 ```
 
 > Use `-j $env:NUMBER_OF_PROCESSORS` on powershell, `-j %NUMBER_OF_PROCESSORS%` on cmd.
+
+The key part is `CMAKE_INSTALL_PREFIX`, see [CMake Config Mode Search Procedure](https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-search-procedure)
 
 ### Integrate with VS Code
 
@@ -86,11 +90,11 @@ Cons
 
   - Long configuration file.
 
-    The tradeoff of explicit is more confiturations, since C/C++ compilers have tons of configurations, no metion to support multiple platforms.
+    The tradeoff of explicit is cumbersome, since C/C++ compilers have tons of configurations, no metion to support multiple platforms.
 
   - Manually ABI compability control.
 
-    Compiler configurations must be consistent between `exccpkgfile.py` and build command. If any thing is broken, the compiler often failes with link errors.
+    Compiler configurations must be consistent between `exccpkgfile.py` and build command. If anything is broken, the compiler often failes with link errors.
 
   - Duplicated source code at project level.
 
