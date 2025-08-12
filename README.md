@@ -58,7 +58,9 @@ cmake --build ./build --config Release --target all -j $env:NUMBER_OF_PROCESSORS
 
 > Use `-j $env:NUMBER_OF_PROCESSORS` on powershell, `-j %NUMBER_OF_PROCESSORS%` on cmd.
 
-#### Makefile
+### Integrate with VS Code
+
+Create [`.vscode/settings.json`](https://gist.github.com/AdjWang/17e23de3b136d2439559547fbd82e729) under project directory.
 
 ## Pros and cons
 
