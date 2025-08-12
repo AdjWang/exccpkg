@@ -6,20 +6,9 @@ from pathlib import Path
 import platform
 import shutil
 from typing import override
+from urllib.parse import urlparse
 
 from exccpkg import exccpkg, tools
-
-# Setup proxy by python black magic :)
-# Would also apply to dependencies that using tool.download
-# from urllib.parse import urlparse
-# raw_download = tools.download
-# def download(url: str, file_path: Path, dryrun: bool=False) -> None:
-#     o = urlparse(url)
-#     if o.hostname == "github.com":
-#         # For machines reside in Chinese mainland.
-#         url = "https://www.ghproxy.cn/" + url
-#     raw_download(url, file_path, dryrun)
-# tools.download = download
 
 
 class Config:
@@ -82,6 +71,10 @@ class CMakeCommon:
     def download(self, url: str, pkg_name: str, ext: str) -> Path:
         package_path = self.cfg.download_dir / f"{pkg_name}{ext}"
         src_path = self.cfg.deps_dir / pkg_name
+        # Setup proxy.
+        if urlparse(url).hostname == "github.com":
+            # For machines reside in Chinese mainland.
+            url = "https://www.ghproxy.cn/" + url
         tools.download(url, package_path, self.cfg.dryrun)
         tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
         return src_path
@@ -137,7 +130,8 @@ class NlohmannJson(exccpkg.Package):
         tools.download(url, download_path, ctx.cfg.dryrun)
         output_dir = ctx.cfg.deps_dir / "nlohmann-json-3.11.3"
         tools.mkdirp(output_dir, ctx.cfg.dryrun)
-        shutil.copy(download_path, output_dir)
+        if not ctx.cfg.dryrun:
+            shutil.copy(download_path, output_dir)
         return output_dir
 
     @override
@@ -149,7 +143,8 @@ class NlohmannJson(exccpkg.Package):
     def install(self, ctx: Context, build_dir: Path) -> None:
         install_dir = ctx.cfg.install_dir / "include/nlohmann"
         tools.mkdirp(install_dir, ctx.cfg.dryrun)
-        shutil.copy(build_dir / "nlohmann-json-3.11.3.hpp", install_dir / "json.hpp")
+        if not ctx.cfg.dryrun:
+            shutil.copy(build_dir / "nlohmann-json-3.11.3.hpp", install_dir / "json.hpp")
 
 
 def collect() -> exccpkg.PackageCollection:
