@@ -4,7 +4,7 @@ from collections import Counter
 import inspect
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 try:
     from typing import Self
 except ImportError:
@@ -28,21 +28,21 @@ class Package(ABC):
         assert(hasattr(self, "version"))
 
     @abstractmethod
-    def grab(self, ctx: Context) -> Path:
+    def grab(self, ctx: Any) -> Path:
         """ Grab package source files. Input context, return package source path. """
         ...
 
     @abstractmethod
-    def build(self, ctx: Context, src_dir: Path) -> Path:
+    def build(self, ctx: Any, src_dir: Path) -> Path:
         """ Build package. Input context and source path, return build path. """
         ...
 
     @abstractmethod
-    def install(self, ctx: Context, build_dir: Path) -> None:
+    def install(self, ctx: Any, build_dir: Path) -> None:
         """ Install package. Input context and build path. """
         ...
 
-    def resolve(self, ctx: Context) -> None:
+    def resolve(self, ctx: Any) -> None:
         """ Run grag, build and install in order. """
         src_dir = self.grab(ctx)
         build_dir = self.build(ctx, src_dir)

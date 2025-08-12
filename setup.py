@@ -1,10 +1,10 @@
-# build: python3 -m build
+# build: python3 -m pip install --upgrade build && python3 -m build
 # upload: twine upload --repository pypi dist/*
 from setuptools import setup
 
 setup(
     name = 'exccpkg',
-    version = '3.0.0',
+    version = '3.0.1',
     # shutil.rmtree onexc https://docs.python.org/3/library/shutil.html#shutil.rmtree
     python_requires='>=3.12',
     description = 'An explicit C++ package builder.',
