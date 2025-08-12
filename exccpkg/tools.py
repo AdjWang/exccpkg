@@ -15,8 +15,11 @@ except ImportError:
     tqdm = __dummy_tqdm
 
 
-def mkdirp(dir: Path) -> None:
+def mkdirp(dir: Path, dryrun: bool=False) -> None:
     """ Equivalent to mkdir -p <dir> """
+    logging.info(f"Make dir: {dir}")
+    if dryrun:
+        return
     dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -43,7 +46,10 @@ def unpack(package_path: Path, target_dir: Path, dryrun: bool=False) -> None:
     shutil.unpack_archive(package_path, target_dir)
 
 
-def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True) -> None:
+def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True, dryrun: bool=False) -> None:
+    logging.info(f"Prepare cmake build dir: {build_dir} rebuild: {rebuild}")
+    if dryrun:
+        return
     # Windows seems can't remove hidden directories, like .git, raising
     # "PermissionError: [WinError 5] Access is denied".
     def __rm_readonly(func, path, exc):

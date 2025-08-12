@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 import os
 from pathlib import Path
 import platform
+import shutil
 from typing import override
 
 from exccpkg import exccpkg, tools
@@ -126,9 +127,36 @@ class AbseilCpp(exccpkg.Package):
         return ctx.cmake.install(build_dir)
 
 
+class NlohmannJson(exccpkg.Package):
+    name = "nlohmann-json"
+    version = "3.11.3"
+
+    @override
+    def grab(self, ctx: Context) -> Path:
+        url = "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp"
+        download_path = ctx.cfg.download_dir / "nlohmann-json-3.11.3.hpp"
+        tools.download(url, download_path)
+        output_dir = ctx.cfg.deps_dir / "nlohmann-json-3.11.3"
+        tools.mkdirp(output_dir)
+        shutil.copy(download_path, output_dir)
+        return output_dir
+
+    @override
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        build_dir = src_dir
+        return build_dir
+    
+    @override
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        install_dir = ctx.cfg.install_dir / "include/nlohmann"
+        tools.mkdirp(install_dir)
+        shutil.copy(build_dir / "nlohmann-json-3.11.3.hpp", install_dir / "json.hpp")
+
+
 def collect() -> exccpkg.PackageCollection:
     collection = exccpkg.PackageCollection([
         AbseilCpp(),
+        NlohmannJson(),
         # ...
     ])
     return collection
