@@ -18,6 +18,10 @@ class Toolset:
     def download(self, url: str, pkg_name: str, ext: str) -> Path:
         logging.info(f'Toolset download url={url} pkg_name={pkg_name} ext={ext}')
         return Path("src_dir")
+
+    def copy(self, path: str, pkg_name: str, ext: str) -> Path:
+        logging.info(f'Toolset copy path={path} pkg_name={pkg_name} ext={ext}')
+        return Path("src_dir")
     
     def build(self, src_dir: Path, options: str = "") -> Path:
         logging.info(f'Toolset build src_dir={src_dir} options={options}')
@@ -57,8 +61,8 @@ class PackageB(exccpkg.Package):
 
     @override
     def grab(self, ctx: Context) -> Path:
-        url = "https://B.download"
-        return ctx.toolset.download(url, "B-B_version", ".tar.gz")
+        path = "file://B.directory"
+        return ctx.toolset.copy(path, "B-B_version", ".tar.gz")
 
     @override
     def build(self, ctx: Context, src_dir: Path) -> Path:
