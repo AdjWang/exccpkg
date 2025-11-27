@@ -79,7 +79,7 @@ class CMakeCommon:
         build_dir = src_dir / "cmake_build" / self.cfg.cmake_build_type
         tools.cmake_prepare_build_dir(build_dir, rebuild=self.cfg.rebuild, dryrun=self.cfg.dryrun)
         tools.run_cmd(f"""cmake {self.cfg.cmake_common} {cmake_options}
-                                -G {self.cfg.generator} -S {src_dir}
+                                -G "{self.cfg.generator}" -S {src_dir}
                                 -B {build_dir}""", self.cfg.dryrun)
         tools.run_cmd(f"""cmake --build {build_dir}
                                 --config={self.cfg.cmake_build_type}
