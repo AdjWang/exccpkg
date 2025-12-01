@@ -96,13 +96,17 @@ class PackageCollection:
                 sub_pkg = importlib.import_module(sub_pkg_path)
                 sub_collection = sub_pkg.collect()
                 self.merge(sub_collection)
-
+        # All nested packages are resolved, try to drop duplications and add
+        # rests.
         no_dup_deps = self.__drop_duplicates()
+        src_dirs = []
         for dep in no_dup_deps:
             if self.__pkg_id(dep) in grab_cache:
-                src_dir = grab_cache[self.__pkg_id(dep)]
+                src_dirs.append(grab_cache[self.__pkg_id(dep)])
             else:
-                src_dir = dep.grab(ctx)
+                src_dirs.append(dep.grab(ctx))
+        # Build and install.
+        for dep, src_dir in zip(no_dup_deps, src_dirs):
             build_dir = dep.build(ctx, src_dir)
             dep.install(ctx, build_dir)
 
