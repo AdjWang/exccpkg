@@ -95,7 +95,7 @@ class PackageCollection:
                 logging.debug(f'loading module={sub_pkg_path}')
                 sub_pkg = importlib.import_module(sub_pkg_path)
                 sub_collection = sub_pkg.collect()
-                self.__merge(sub_collection)
+                self.merge(sub_collection)
 
         no_dup_deps = self.__drop_duplicates()
         for dep in no_dup_deps:
