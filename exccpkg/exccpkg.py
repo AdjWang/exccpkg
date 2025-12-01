@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
 from collections import Counter
+import importlib.util
 import inspect
 import logging
 from pathlib import Path
+import sys
 from typing import Any, Dict, List, Tuple
 try:
     from typing import Self
@@ -48,23 +50,64 @@ class Package(ABC):
         build_dir = self.build(ctx, src_dir)
         self.install(ctx, build_dir)
 
+
 class PackageCollection:
     def __init__(self, deps: List[Package]) -> None:
+        # Packages of current module.
         self.__deps = deps
         self.__deps_depth: Dict[str, Tuple[int, Package]] = dict()
         for dep in self.__deps:
-            self.__deps_depth[f"{dep.name}-{dep.version}"] = (0, dep)
+            self.__deps_depth[self.__pkg_id(dep)] = (0, dep)
+        # Pending packages that resolved after downloading current packages.
+        self.__pending_pkgs: List[str] = []
+
+    def add_package(self, exccpkg_module: str) -> None:
+        """
+        Add packages from path.
+
+        Merging subpackages requires them had been downloadad to check
+        exccpkgfile, therefore needs input as path before downloading
+        instead of a python module.
+        """
+        self.__pending_pkgs.append(exccpkg_module)
 
     def merge(self, collection: Self) -> None:
         """ Merge packages from child projects with larger depth. """
         self.__deps.extend(collection.__deps)
         for id, dep in collection.__deps_depth.items():
             self.__deps_depth[id] = (dep[0] + 1, dep[1])
-    
+        self.__pending_pkgs.extend(collection.__pending_pkgs)
+
     def resolve(self, ctx: Context) -> None:
+        grab_cache: Dict[str, Path] = dict()
+        # Recursively add sub package directories.
+        while len(self.__pending_pkgs) > 0:
+            # Download first.
+            no_dup_deps = self.__drop_duplicates()
+            for dep in no_dup_deps:
+                if self.__pkg_id(dep) not in grab_cache:
+                    src_dir = dep.grab(ctx)
+                    grab_cache[self.__pkg_id(dep)] = src_dir
+            # Import sub packages.
+            pending_pkgs = self.__pending_pkgs
+            self.__pending_pkgs = []
+            for sub_pkg_path in pending_pkgs:
+                logging.debug(f'loading module={sub_pkg_path}')
+                sub_pkg = importlib.import_module(sub_pkg_path)
+                sub_collection = sub_pkg.collect()
+                self.__merge(sub_collection)
+
         no_dup_deps = self.__drop_duplicates()
         for dep in no_dup_deps:
-            dep.resolve(ctx)
+            if self.__pkg_id(dep) in grab_cache:
+                src_dir = grab_cache[self.__pkg_id(dep)]
+            else:
+                src_dir = dep.grab(ctx)
+            build_dir = dep.build(ctx, src_dir)
+            dep.install(ctx, build_dir)
+
+    def __pkg_id(self, pkg: Package) -> str:
+        return f"{pkg.name}-{pkg.version}"
 
     def __find_duplicate_deps(self) -> Dict[str, List[int]]:
         names = [dep.name for dep in self.__deps]

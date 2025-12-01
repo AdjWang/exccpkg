@@ -6,8 +6,6 @@ from pathlib import Path
 import platform
 from typing import override
 
-import deps.Bar.exccpkgfile as deps_bar
-import deps.Baz.exccpkgfile as deps_baz
 from exccpkg import exccpkg, tools
 
 
@@ -122,8 +120,8 @@ def collect() -> exccpkg.PackageCollection:
         AbseilCpp(),
         # ...
     ])
-    collection.merge(deps_bar.collect())
-    collection.merge(deps_baz.collect())
+    collection.add_package("deps.Bar.exccpkgfile")
+    collection.add_package("deps.Baz.exccpkgfile")
     return collection
 
 
@@ -136,7 +134,7 @@ def resolve(ctx: Context, collection: exccpkg.PackageCollection) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     ctx = Context()
     collection = collect()
     resolve(ctx, collection)
