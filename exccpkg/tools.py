@@ -53,7 +53,11 @@ def cmake_prepare_build_dir(build_dir: Path, rebuild: bool = True, dryrun: bool=
     # Windows seems can't remove hidden directories, like .git, raising
     # "PermissionError: [WinError 5] Access is denied".
     def __rm_readonly(func, path, exc):
-        excvalue = exc[1]
+        # exc is the exception instance in 3.14+ while a tuple in <3.14
+        if hasattr(exc, 'errno'):
+            excvalue = exc
+        else:
+            excvalue = exc[1]
         if (platform.system() == "Windows" and
             excvalue.errno in (errno.EACCES, errno.ENOTEMPTY)):
             # Try platform specific commands.
