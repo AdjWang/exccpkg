@@ -115,7 +115,7 @@ class AbseilCpp(exccpkg.Package):
         return ctx.cmake.install(build_dir)
 
 
-def collect() -> exccpkg.PackageCollection:
+def collect(ctx: Context) -> exccpkg.PackageCollection:
     collection = exccpkg.PackageCollection([
         AbseilCpp(),
         # ...
@@ -134,5 +134,5 @@ def resolve(ctx: Context, collection: exccpkg.PackageCollection) -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ctx = Context()
-    collection = collect()
+    collection = collect(ctx)
     resolve(ctx, collection)

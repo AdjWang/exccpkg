@@ -147,7 +147,7 @@ class NlohmannJson(exccpkg.Package):
             shutil.copy(build_dir / "nlohmann-json-3.11.3.hpp", install_dir / "json.hpp")
 
 
-def collect() -> exccpkg.PackageCollection:
+def collect(ctx: Context) -> exccpkg.PackageCollection:
     collection = exccpkg.PackageCollection([
         AbseilCpp(),
         NlohmannJson(),
@@ -167,5 +167,5 @@ def resolve(ctx: Context, collection: exccpkg.PackageCollection) -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ctx = Context()
-    collection = collect()
+    collection = collect(ctx)
     resolve(ctx, collection)

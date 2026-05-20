@@ -94,7 +94,7 @@ class PackageCollection:
             for sub_pkg_path in pending_pkgs:
                 logging.debug(f'loading module={sub_pkg_path}')
                 sub_pkg = importlib.import_module(sub_pkg_path)
-                sub_collection = sub_pkg.collect()
+                sub_collection = sub_pkg.collect(ctx)
                 self.merge(sub_collection)
         # All nested packages are resolved, try to drop duplications and add
         # rests.
