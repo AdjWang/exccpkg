@@ -71,12 +71,12 @@ class PackageCollection:
 
     def add_dependency_collection(self, collection: Self) -> None:
         """ Add packages with larger depth. """
-        collection.__depth = max(collection.__depth, self.__depth + 1)
         self.__sub_collections.append(collection)
 
     def resolve(self, ctx: Context) -> List[Package]:
         # Resulve dependency map.
         self.__check_conflictions()
+        self.__set_depth(self.__depth)
         depth_pkgs: List[Tuple[int, Package]] = self.__filter_pkgs()
         logging.debug(f"Resolved pkgs={[(pkg[0], self.__pkg_id(pkg[1])) for pkg in depth_pkgs]}")
         pkgs = [pkg[1] for pkg in depth_pkgs]
@@ -90,6 +90,11 @@ class PackageCollection:
     @staticmethod
     def __pkg_id(pkg: Package) -> str:
         return f"{getattr(pkg, "name")}-{getattr(pkg, "version")}"
+
+    def __set_depth(self, depth: int) -> None:
+        self.__depth = depth
+        for collection in self.__sub_collections:
+            collection.__set_depth(depth + 1)
 
     def __filter_pkgs(self) -> List[Tuple[int, Package]]:
         """Drop duplications and get max depth."""
