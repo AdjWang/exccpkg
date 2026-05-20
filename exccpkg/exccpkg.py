@@ -59,9 +59,9 @@ class PackageCollection:
         for dep in self.__deps:
             self.__deps_depth[self.__pkg_id(dep)] = (0, dep)
         # Pending packages that resolved after downloading current packages.
-        self.__pending_pkgs: List[str] = []
+        self.__pending_pkgs: List[Tuple[str, Path]] = []
 
-    def add_package(self, exccpkg_module: str) -> None:
+    def add_package(self, name: str, exccpkg_module: Path) -> None:
         """
         Add packages from path.
 
@@ -69,7 +69,7 @@ class PackageCollection:
         exccpkgfile, therefore needs input as path before downloading
         instead of a python module.
         """
-        self.__pending_pkgs.append(exccpkg_module)
+        self.__pending_pkgs.append((name, exccpkg_module))
 
     def merge(self, collection: Self) -> None:
         """ Merge packages from child projects with larger depth. """
@@ -91,9 +91,9 @@ class PackageCollection:
             # Import sub packages.
             pending_pkgs = self.__pending_pkgs
             self.__pending_pkgs = []
-            for sub_pkg_path in pending_pkgs:
-                logging.debug(f'loading module={sub_pkg_path}')
-                sub_pkg = importlib.import_module(sub_pkg_path)
+            for sub_pkg_name, sub_pkg_path in pending_pkgs:
+                logging.debug(f'loading module={sub_pkg_name} at={sub_pkg_path}')
+                sub_pkg = self.__import_from_path(sub_pkg_name, sub_pkg_path)
                 sub_collection = sub_pkg.collect(ctx)
                 self.merge(sub_collection)
         # All nested packages are resolved, try to drop duplications and add
@@ -151,3 +151,11 @@ class PackageCollection:
         output_deps = [dep[1] for dep in reversed(no_dup_deps)]
         logging.debug(f"Packages={[f"{dep.name}-{dep.version}" for dep in output_deps]}")
         return output_deps
+
+    @staticmethod
+    def __import_from_path(module_name, file_path):
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
