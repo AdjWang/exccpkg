@@ -21,17 +21,25 @@ class Config:
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
         self.generator = "Ninja"
 
-        # sanitizer = "-fsanitize=thread"
-        sanitizer = ""
+        self.sanitizer = "none"
+        if self.sanitizer == "address":
+            cxx_sanitizer = "-fsanitize=address"
+            ld_sanitizer = "-lasan"
+        elif self.sanitizer == "thread":
+            cxx_sanitizer = "-fsanitize=thread"
+            ld_sanitizer = "-ltsan"
+        else:
+            cxx_sanitizer = ""
+            ld_sanitizer = ""
         CFLAGS = defaultdict(dict)
         CXXFLAGS = defaultdict(dict)
         LDFLAGS = defaultdict(dict)
-        CFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {sanitizer} -fno-omit-frame-pointer -g"
+        CFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {cxx_sanitizer} -fno-omit-frame-pointer -g"
         CFLAGS["Linux"]["Release"] = "-fdata-sections -ffunction-sections -fno-omit-frame-pointer -g -Wno-error=deprecated-declarations"
-        CXXFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {sanitizer} -fno-omit-frame-pointer -g"
+        CXXFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {cxx_sanitizer} -fno-omit-frame-pointer -g"
         CXXFLAGS["Linux"]["Release"] = "-fdata-sections -ffunction-sections -fno-omit-frame-pointer -g -Wno-error=deprecated-declarations"
-        LDFLAGS["Linux"]["Debug"] = "-Wl,--gc-sections"
-        LDFLAGS["Linux"]["Release"] = "-Wl,--gc-sections"
+        LDFLAGS["Linux"]["Debug"] = f"-Wl,--gc-sections {ld_sanitizer}"
+        LDFLAGS["Linux"]["Release"] = f"-Wl,--gc-sections {ld_sanitizer}"
         CFLAGS["Windows"]["Debug"] = "/MP /utf-8 /EHsc"
         CFLAGS["Windows"]["Release"] = "/MP /utf-8 /Gy /EHsc"
         CXXFLAGS["Windows"]["Debug"] = "/MP /utf-8 /EHsc"
@@ -43,7 +51,8 @@ class Config:
             -DCMAKE_BUILD_TYPE={self.cmake_build_type}
             -DCMAKE_CXX_STANDARD=23
             -DCMAKE_INSTALL_PREFIX={self.install_dir}
-            -DCMAKE_INSTALL_LIBDIR=lib """
+            -DCMAKE_INSTALL_LIBDIR=lib
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 """
         if platform.system() == "Linux":
             os.environ["CFLAGS"] = CFLAGS["Linux"][self.cmake_build_type]
             os.environ["CXXFLAGS"] = CXXFLAGS["Linux"][self.cmake_build_type]
@@ -68,15 +77,18 @@ class CMakeCommon:
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
-    def download(self, url: str, pkg_name: str, ext: str) -> Path:
+    def download(self, url: str, pkg_name: str, ext: str, unpack_dir: str = "") -> Path:
         package_path = self.cfg.download_dir / f"{pkg_name}{ext}"
         src_path = self.cfg.deps_dir / pkg_name
         # Setup proxy.
-        if urlparse(url).hostname == "github.com":
-            # For machines reside in Chinese mainland.
-            url = "https://www.ghproxy.cn/" + url
+        # if urlparse(url).hostname == "github.com":
+        #     # For machines reside in Chinese mainland.
+        #     url = "https://www.ghproxy.cn/" + url
         tools.download(url, package_path, self.cfg.dryrun)
-        tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
+        if unpack_dir == "":
+            tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
+        else:
+            tools.unpack(package_path, self.cfg.deps_dir / unpack_dir, self.cfg.dryrun)
         return src_path
     
     def build(self, src_dir: Path, cmake_options: str = "") -> Path:
@@ -92,6 +104,7 @@ class CMakeCommon:
     
     def install(self, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
+                                --config={self.cfg.cmake_build_type}
                                 --prefix={self.cfg.install_dir}""", self.cfg.dryrun)
 
 
@@ -150,9 +163,14 @@ class NlohmannJson(exccpkg.Package):
 def collect(ctx: Context) -> exccpkg.PackageCollection:
     collection = exccpkg.PackageCollection([
         AbseilCpp(),
-        NlohmannJson(),
         # ...
     ])
+    # Dependency collection resolved first. For this example, resolve
+    # NlohmannJson then AbseilCpp.
+    collection.add_dependency_collection(exccpkg.PackageCollection([
+        NlohmannJson(),
+        # ...
+    ]))
     return collection
 
 

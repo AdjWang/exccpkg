@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name = 'exccpkg',
-    version = '3.1.0',
+    version = '4.0.0',
     # shutil.rmtree onexc https://docs.python.org/3/library/shutil.html#shutil.rmtree
     python_requires='>=3.12',
     description = 'An explicit C++ package builder.',

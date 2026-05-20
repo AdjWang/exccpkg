@@ -1,0 +1,13 @@
+[project]
+name = "nested"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "exccpkg",
+    "tqdm>=4.67.3",
+]
+
+[tool.uv.sources]
+exccpkg = { path = "../../" }

@@ -73,14 +73,20 @@ class PackageB(exccpkg.Package):
         return ctx.toolset.install(build_dir)
 
 
-def collect() -> exccpkg.PackageCollection:
+def collect(ctx: Context) -> exccpkg.PackageCollection:
+    # Add unordered dependencies.
     collection = exccpkg.PackageCollection([
         PackageA(),
     ])
-    # Add child dependencies, resolved former than above.
-    collection.merge(exccpkg.PackageCollection([
-      PackageB(),
+    # Add child dependencies, resolve former than above.
+    # For this example, resolve PackageB then PackageA.
+    collection.add_dependency_collection(exccpkg.PackageCollection([
+        PackageB(),
     ]))
+    # Add PackageB's dependencies through its exccpkgfile.py, resolve former
+    # than above.
+    # If PackageB does not have exccpkgfile.py, do not add this.
+    # collection.add_submodule(ctx, PackageB())
     return collection
 
 
@@ -99,5 +105,5 @@ if __name__ == "__main__":
     logging.info(f'cpu_count={cpu_count()}')
 
     ctx = Context()
-    collection = collect()
+    collection = collect(ctx)
     resolve(ctx, collection)

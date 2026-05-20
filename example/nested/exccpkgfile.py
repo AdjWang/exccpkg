@@ -8,6 +8,9 @@ from typing import override
 
 from exccpkg import exccpkg, tools
 
+PROJ_DIR = Path(__file__).parent.resolve()
+DEPS_DIR = (PROJ_DIR / "deps").resolve()
+
 
 class Config:
     def __init__(self) -> None:
@@ -19,17 +22,25 @@ class Config:
         self.install_dir = self.deps_dir / "out" / self.cmake_build_type
         self.generator = "Ninja"
 
-        # sanitizer = "-fsanitize=thread"
-        sanitizer = ""
+        self.sanitizer = "none"
+        if self.sanitizer == "address":
+            cxx_sanitizer = "-fsanitize=address"
+            ld_sanitizer = "-lasan"
+        elif self.sanitizer == "thread":
+            cxx_sanitizer = "-fsanitize=thread"
+            ld_sanitizer = "-ltsan"
+        else:
+            cxx_sanitizer = ""
+            ld_sanitizer = ""
         CFLAGS = defaultdict(dict)
         CXXFLAGS = defaultdict(dict)
         LDFLAGS = defaultdict(dict)
-        CFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {sanitizer} -fno-omit-frame-pointer -g"
+        CFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {cxx_sanitizer} -fno-omit-frame-pointer -g"
         CFLAGS["Linux"]["Release"] = "-fdata-sections -ffunction-sections -fno-omit-frame-pointer -g -Wno-error=deprecated-declarations"
-        CXXFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {sanitizer} -fno-omit-frame-pointer -g"
+        CXXFLAGS["Linux"]["Debug"] = f"-fdata-sections -ffunction-sections {cxx_sanitizer} -fno-omit-frame-pointer -g"
         CXXFLAGS["Linux"]["Release"] = "-fdata-sections -ffunction-sections -fno-omit-frame-pointer -g -Wno-error=deprecated-declarations"
-        LDFLAGS["Linux"]["Debug"] = "-Wl,--gc-sections"
-        LDFLAGS["Linux"]["Release"] = "-Wl,--gc-sections"
+        LDFLAGS["Linux"]["Debug"] = f"-Wl,--gc-sections {ld_sanitizer}"
+        LDFLAGS["Linux"]["Release"] = f"-Wl,--gc-sections {ld_sanitizer}"
         CFLAGS["Windows"]["Debug"] = "/MP /utf-8 /EHsc"
         CFLAGS["Windows"]["Release"] = "/MP /utf-8 /Gy /EHsc"
         CXXFLAGS["Windows"]["Debug"] = "/MP /utf-8 /EHsc"
@@ -37,25 +48,24 @@ class Config:
         LDFLAGS["Windows"]["Debug"] = "/OPT:REF /INCREMENTAL:NO"
         LDFLAGS["Windows"]["Release"] = "/OPT:REF /INCREMENTAL:NO"
 
-        if self.cmake_build_type == "Release":
-            self.msvc_rt_lib = "MultiThreaded"
-        else:
-            self.msvc_rt_lib = "MultiThreadedDebug"
-
-        # Use policy CMP0091 with CMAKE_MSVC_RUNTIME_LIBRARY
-        # See: https://cmake.org/cmake/help/latest/policy/CMP0091.html
         self.cmake_common = f"""
             -DCMAKE_BUILD_TYPE={self.cmake_build_type}
             -DCMAKE_CXX_STANDARD=23
-            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-            -DCMAKE_MSVC_RUNTIME_LIBRARY={self.msvc_rt_lib}
             -DCMAKE_INSTALL_PREFIX={self.install_dir}
-            -DCMAKE_INSTALL_LIBDIR=lib """
+            -DCMAKE_INSTALL_LIBDIR=lib
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 """
         if platform.system() == "Linux":
             os.environ["CFLAGS"] = CFLAGS["Linux"][self.cmake_build_type]
             os.environ["CXXFLAGS"] = CXXFLAGS["Linux"][self.cmake_build_type]
             os.environ["LDFLAGS"] = LDFLAGS["Linux"][self.cmake_build_type]
         elif platform.system() == "Windows":
+            if self.cmake_build_type == "Release":
+                self.msvc_rt_lib = "MultiThreaded"
+            else:
+                self.msvc_rt_lib = "MultiThreadedDebug"
+            # Use policy CMP0091 with CMAKE_MSVC_RUNTIME_LIBRARY
+            # See: https://cmake.org/cmake/help/latest/policy/CMP0091.html
+            self.cmake_common += f'-DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY={self.msvc_rt_lib} '
             self.cmake_common += f'-DCMAKE_C_FLAGS="{CFLAGS["Windows"][self.cmake_build_type]} "'
             self.cmake_common += f'-DCMAKE_CXX_FLAGS="{CXXFLAGS["Windows"][self.cmake_build_type]} "'
             self.cmake_common += f'-DCMAKE_LINK_FLAGS="{LDFLAGS["Windows"][self.cmake_build_type]} "'
@@ -68,11 +78,14 @@ class CMakeCommon:
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
-    def download(self, url: str, pkg_name: str, ext: str) -> Path:
+    def download(self, url: str, pkg_name: str, ext: str, unpack_dir: str = "") -> Path:
         package_path = self.cfg.download_dir / f"{pkg_name}{ext}"
         src_path = self.cfg.deps_dir / pkg_name
         tools.download(url, package_path, self.cfg.dryrun)
-        tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
+        if unpack_dir == "":
+            tools.unpack(package_path, self.cfg.deps_dir, self.cfg.dryrun)
+        else:
+            tools.unpack(package_path, self.cfg.deps_dir / unpack_dir, self.cfg.dryrun)
         return src_path
     
     def build(self, src_dir: Path, cmake_options: str = "") -> Path:
@@ -88,6 +101,7 @@ class CMakeCommon:
     
     def install(self, build_dir: Path) -> None:
         tools.run_cmd(f"""cmake --install {build_dir}
+                                --config={self.cfg.cmake_build_type}
                                 --prefix={self.cfg.install_dir}""", self.cfg.dryrun)
 
 
@@ -115,13 +129,49 @@ class AbseilCpp(exccpkg.Package):
         return ctx.cmake.install(build_dir)
 
 
+class Bar(exccpkg.Package):
+    name = "Bar"
+    version = "v0.0.0"
+
+    @override
+    def grab(self, ctx: Context) -> Path:
+        return DEPS_DIR / "Bar"
+
+    @override
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        return ctx.cmake.build(src_dir)
+
+    @override
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        return ctx.cmake.install(build_dir)
+
+
+class Baz(exccpkg.Package):
+    name = "Baz"
+    version = "v0.0.0"
+
+    @override
+    def grab(self, ctx: Context) -> Path:
+        return DEPS_DIR / "Baz"
+
+    @override
+    def build(self, ctx: Context, src_dir: Path) -> Path:
+        return ctx.cmake.build(src_dir)
+
+    @override
+    def install(self, ctx: Context, build_dir: Path) -> None:
+        return ctx.cmake.install(build_dir)
+
+
 def collect(ctx: Context) -> exccpkg.PackageCollection:
     collection = exccpkg.PackageCollection([
         AbseilCpp(),
         # ...
     ])
-    collection.add_package("deps.Bar.exccpkgfile")
-    collection.add_package("deps.Baz.exccpkgfile")
+    # Execute grab and collect recursively to get submodule's submodules.
+    # Submodule resolved first.
+    collection.add_submodule(ctx, Bar())
+    collection.add_submodule(ctx, Baz())
     return collection
 
 
@@ -134,7 +184,7 @@ def resolve(ctx: Context, collection: exccpkg.PackageCollection) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     ctx = Context()
     collection = collect(ctx)
     resolve(ctx, collection)

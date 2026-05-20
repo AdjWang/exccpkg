@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
-from collections import Counter
+from collections import Counter, defaultdict
 import importlib.util
 import inspect
 import logging
@@ -52,108 +52,93 @@ class Package(ABC):
 
 
 class PackageCollection:
-    def __init__(self, deps: List[Package]) -> None:
+    def __init__(self, pkgs: List[Package]) -> None:
+        self.__depth = 0
         # Packages of current module.
-        self.__deps = deps
-        self.__deps_depth: Dict[str, Tuple[int, Package]] = dict()
-        for dep in self.__deps:
-            self.__deps_depth[self.__pkg_id(dep)] = (0, dep)
-        # Pending packages that resolved after downloading current packages.
-        self.__pending_pkgs: List[Tuple[str, Path]] = []
+        self.__pkgs: List[Package] = pkgs
+        self.__sub_collections: List[PackageCollection] = []
 
-    def add_package(self, name: str, exccpkg_module: Path) -> None:
-        """
-        Add packages from path.
+    def add_submodule(
+        self, ctx: Context, submodule: Package, exccpkgfilepath: str = "exccpkgfile.py"
+    ) -> None:
+        """ Add submodule. """
+        src_dir = submodule.grab(ctx)
+        submodule_name = getattr(submodule, "name")
+        submodule_path = Path(src_dir) / exccpkgfilepath
+        sub_pkg = self.__import_from_path(submodule_name, submodule_path)
+        sub_collection = sub_pkg.collect(ctx)
+        self.add_dependency_collection(sub_collection)
 
-        Merging subpackages requires them had been downloadad to check
-        exccpkgfile, therefore needs input as path before downloading
-        instead of a python module.
-        """
-        self.__pending_pkgs.append((name, exccpkg_module))
+    def add_dependency_collection(self, collection: Self) -> None:
+        """ Add packages with larger depth. """
+        collection.__depth = max(collection.__depth, self.__depth + 1)
+        self.__sub_collections.append(collection)
 
-    def merge(self, collection: Self) -> None:
-        """ Merge packages from child projects with larger depth. """
-        self.__deps.extend(collection.__deps)
-        for id, dep in collection.__deps_depth.items():
-            self.__deps_depth[id] = (dep[0] + 1, dep[1])
-        self.__pending_pkgs.extend(collection.__pending_pkgs)
+    def resolve(self, ctx: Context) -> List[Package]:
+        # Resulve dependency map.
+        self.__check_conflictions()
+        depth_pkgs: List[Tuple[int, Package]] = self.__filter_pkgs()
+        logging.debug(f"Resolved pkgs={[(pkg[0], self.__pkg_id(pkg[1])) for pkg in depth_pkgs]}")
+        pkgs = [pkg[1] for pkg in depth_pkgs]
+        # Grab, build and install.
+        src_dirs = [pkg.grab(ctx) for pkg in pkgs]
+        for pkg, src_dir in zip(pkgs, src_dirs):
+            build_dir = pkg.build(ctx, src_dir)
+            pkg.install(ctx, build_dir)
+        return pkgs
 
-    def resolve(self, ctx: Context) -> None:
-        grab_cache: Dict[str, Path] = dict()
-        # Recursively add sub package directories.
-        while len(self.__pending_pkgs) > 0:
-            # Download first.
-            no_dup_deps = self.__drop_duplicates()
-            for dep in no_dup_deps:
-                if self.__pkg_id(dep) not in grab_cache:
-                    src_dir = dep.grab(ctx)
-                    grab_cache[self.__pkg_id(dep)] = src_dir
-            # Import sub packages.
-            pending_pkgs = self.__pending_pkgs
-            self.__pending_pkgs = []
-            for sub_pkg_name, sub_pkg_path in pending_pkgs:
-                logging.debug(f'loading module={sub_pkg_name} at={sub_pkg_path}')
-                sub_pkg = self.__import_from_path(sub_pkg_name, sub_pkg_path)
-                sub_collection = sub_pkg.collect(ctx)
-                self.merge(sub_collection)
-        # All nested packages are resolved, try to drop duplications and add
-        # rests.
-        no_dup_deps = self.__drop_duplicates()
-        src_dirs = []
-        for dep in no_dup_deps:
-            if self.__pkg_id(dep) in grab_cache:
-                src_dirs.append(grab_cache[self.__pkg_id(dep)])
-            else:
-                src_dirs.append(dep.grab(ctx))
-        # Build and install.
-        for dep, src_dir in zip(no_dup_deps, src_dirs):
-            build_dir = dep.build(ctx, src_dir)
-            dep.install(ctx, build_dir)
+    @staticmethod
+    def __pkg_id(pkg: Package) -> str:
+        return f"{getattr(pkg, "name")}-{getattr(pkg, "version")}"
 
-    def __pkg_id(self, pkg: Package) -> str:
-        return f"{pkg.name}-{pkg.version}"
+    def __filter_pkgs(self) -> List[Tuple[int, Package]]:
+        """Drop duplications and get max depth."""
+        # Get all packages.
+        # Dict[id, Tuple[depth, Package]]
+        id_depth_pkgs: Dict[str, Tuple[int, Package]] = dict()
+        for pkg in self.__pkgs:
+            id_depth_pkgs[self.__pkg_id(pkg)] = (self.__depth, pkg)
+        for collection in self.__sub_collections:
+            for (depth, pkg) in collection.__filter_pkgs():
+                id = self.__pkg_id(pkg)
+                if id in id_depth_pkgs:
+                    id_depth_pkgs[id] = (max(depth, id_depth_pkgs[id][0]), pkg)
+                else:
+                    id_depth_pkgs[id] = (depth, pkg)
+        pkgs_sorted: List[Tuple[int, Package]] = list(id_depth_pkgs.values())
+        pkgs_sorted = sorted(pkgs_sorted, key=lambda x: x[0], reverse=True)
+        return pkgs_sorted
 
-    def __find_duplicate_deps(self) -> Dict[str, List[int]]:
-        names = [dep.name for dep in self.__deps]
-        counts = Counter(names)
-        duplicate_names = [item for item, count in counts.items() if count > 1]
-        name_indices: Dict[str, List[int]] = {}
-        for dup_name in duplicate_names:
-            indices = [idx for idx, name in enumerate(names) if name == dup_name]
-            name_indices[dup_name] = indices
-        return name_indices
-
-    def __drop_duplicates(self) -> List[Package]:
-        vers = [dep.version for dep in self.__deps]
-        pkginfos = [
-            f'{inspect.getsourcefile(dep.__class__)}:{inspect.getsourcelines(dep.__class__)[1]}'
-            for dep in self.__deps
+    def __check_conflictions(self) -> None:
+        """ Check if there are packages with same name but different versions. """
+        # Get all packages.
+        pkgs: List[Package] = self.__pkgs
+        for collection in self.__sub_collections:
+            pkgs.extend(collection.__pkgs)
+        names = [getattr(pkg, "name") for pkg in pkgs]
+        vers = [getattr(pkg, "version") for pkg in pkgs]
+        infos = [
+            f"{inspect.getsourcefile(pkg.__class__)}:{inspect.getsourcelines(pkg.__class__)[1]}"
+            for pkg in pkgs
         ]
         # Check version conflictions.
-        dup_deps = self.__find_duplicate_deps()
-        for dup_dep_name, dep_indices in dup_deps.items():
-            dep_vers = [vers[i] for i in dep_indices]
-            dep_infos = [pkginfos[i] for i in dep_indices]
-            if len(set(dep_vers)) > 1:
+        # Dict[name, Dict[vers, info]]
+        dup_deps: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+        for i in range(len(pkgs)):
+            dup_deps[names[i]].append((vers[i], infos[i]))
+        for name, dups in dup_deps.items():
+            ver_count = len(set([dup[0] for dup in dups]))
+            if ver_count > 1:
                 logging.error("Version confliction:")
-                logging.error(f"Package name: {dup_dep_name}")
-                logging.error(f"Package versions: {dep_vers}")
-                logging.error(f"Package sources:")
-                for info in dep_infos:
-                    logging.error(info)
+                logging.error(f"Package name: {name}")
+                logging.error(f"Package versions: {dups}")
                 raise Exception(f'Version confliction')
-            else:
-                logging.debug(f"Find duplications name={dup_dep_name} vers={dep_vers} infos={dep_infos}")
-        # Drop duplications.
-        no_dup_deps: List[Tuple[int, Package]] = list(self.__deps_depth.values())
-        # Output in depth decending order.
-        no_dup_deps = sorted(no_dup_deps, key=lambda x: x[0])
-        output_deps = [dep[1] for dep in reversed(no_dup_deps)]
-        logging.debug(f"Packages={[f"{dep.name}-{dep.version}" for dep in output_deps]}")
-        return output_deps
+            elif ver_count == 1 and len(dups) > 1:
+                logging.debug(f"Found duplicates name={name} vers={dups}")
 
     @staticmethod
     def __import_from_path(module_name, file_path):
+        logging.debug(f'loading module={module_name} at={file_path}')
         spec = importlib.util.spec_from_file_location(module_name, file_path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
